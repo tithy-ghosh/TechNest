@@ -1,0 +1,53 @@
+const express    = require('express');
+const cors       = require('cors');
+const helmet     = require('helmet');
+const morgan     = require('morgan');
+const compression= require('compression');
+const cookieParser = require('cookie-parser');
+const { errorHandler } = require('./middleware/error.middleware');
+
+const app = express();
+
+// Security & utility middleware
+app.use(helmet());
+app.use(cors({
+  origin: (origin, callback) => {
+    const allowed = [
+      'http://localhost:3000',
+      'https://technest-frontend.vercel.app',
+      process.env.CLIENT_URL?.replace(/\/$/, '')
+    ];
+    if (!origin || allowed.includes(origin)) callback(null, true);
+    else callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+}));
+app.use(morgan('dev'));
+app.use(compression());
+app.use(cookieParser());
+
+// Stripe webhook needs raw body — register BEFORE express.json()
+app.use('/api/v1/payments/webhook',
+  express.raw({ type: 'application/json' }),
+  require('./webhooks/stripe.webhook').handleStripeWebhook
+);
+
+
+app.use(express.json());
+
+
+
+// Routes (add as you build each feature)
+app.use('/api/v1/auth',     require('./routes/auth.routes'));
+app.use('/api/v1/products', require('./routes/product.routes'));
+app.use('/api/v1/cart',     require('./routes/cart.routes'));
+app.use('/api/v1/orders',   require('./routes/order.routes'));
+// app.use('/api/v1/reviews',  require('./routes/review.routes'));
+app.use('/api/v1/payments', require('./routes/payment.routes'));
+app.use('/api/v1/chat',     require('./routes/chat.routes'));
+app.use('/api/v1/admin',    require('./routes/admin.routes'));
+app.use('/api/v1/users',    require('./routes/user.routes'));
+app.use('/api/v1/coupons', require('./routes/coupon.routes'));
+app.use('/api/v1/subscribe', require('./routes/subscribe.routes'));
+app.use(errorHandler);
+module.exports = app;
